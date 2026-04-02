@@ -1,6 +1,6 @@
 # Datadog Agent Check for DBLab
 
-A custom [Datadog Agent check](https://docs.datadoghq.com/extend/custom_checks/write_agent_check/) that monitors [DBLab Engine](https://postgres.ai/docs/reference-guides/dblab-engine) (Database Lab Engine) instances.
+A custom [Datadog Agent check](https://docs.datadoghq.com/extend/custom_checks/write_agent_check/) that monitors [DBLab Engine](https://postgres.ai/products/dblab_engine) (Database Lab Engine) instances.
 
 Compatible with **DBLab 3.5.0** and **4.0+**.
 
