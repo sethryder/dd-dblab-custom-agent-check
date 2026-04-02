@@ -1,0 +1,30 @@
+## All options defined here are available to all instances.
+#
+init_config:
+
+instances:
+
+    ## @param url - string - required
+    ## Base URL of the DBLab Engine API (no trailing slash).
+    ## Example: https://dblab.example.com/api
+    #
+  - url: "https://<DBLAB_HOST>/api"
+
+    ## @param verification_token - string - required
+    ## The verification token for the DBLab Engine instance.
+    ## Found in the DBLab Engine configuration under `server.verificationToken`.
+    #
+    verification_token: "<VERIFICATION_TOKEN>"
+
+    ## @param tags - list of strings - optional
+    ## A list of tags to attach to every metric and service check emitted by this instance.
+    #
+    tags:
+      - "env:dev"
+      - "dblab_instance:<INSTANCE_NAME>"
+
+    ## @param min_collection_interval - integer - optional - default: 60
+    ## Collection interval in seconds. DBLab refresh cycles are typically
+    ## hours apart, so 60s is usually sufficient.
+    #
+    # min_collection_interval: 60
