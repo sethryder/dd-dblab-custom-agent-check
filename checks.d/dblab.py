@@ -15,13 +15,19 @@ from datadog_checks.base import AgentCheck, ConfigurationError
 
 STATUS_CODE_MAP = {
     "ok": AgentCheck.OK,
+    "active": AgentCheck.OK,
+    "inactive": AgentCheck.OK,
+    "finished": AgentCheck.OK,
+    "done": AgentCheck.OK,
+    "running": AgentCheck.OK,
+    "healthy": AgentCheck.OK,
+    "refreshing": AgentCheck.OK,
     "warning": AgentCheck.WARNING,
     "warn": AgentCheck.WARNING,
+    "pending": AgentCheck.WARNING,
     "error": AgentCheck.CRITICAL,
     "err": AgentCheck.CRITICAL,
     "failed": AgentCheck.CRITICAL,
-    "pending": AgentCheck.WARNING,
-    "refreshing": AgentCheck.OK,
 }
 
 
@@ -139,6 +145,7 @@ class DblabCheck(AgentCheck):
     def _check_sync_status(self, data, tags):
         sync = data.get("synchronization")
         if sync is None:
+            self.service_check("sync.health", AgentCheck.UNKNOWN, tags=tags, message="No synchronization data in response")
             return
 
         status = sync.get("status", {})
