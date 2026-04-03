@@ -1,0 +1,816 @@
+{
+  "title": "DBLab Engine Monitor",
+  "description": "Monitors DBLab (Database Lab Engine) instances — health checks, replication lag, data freshness, pool storage, and cloning metrics.",
+  "layout_type": "ordered",
+  "reflow_type": "fixed",
+  "template_variables": [
+    {
+      "name": "env",
+      "prefix": "env",
+      "available_values": [],
+      "default": "*"
+    },
+    {
+      "name": "dblab_instance",
+      "prefix": "dblab_instance",
+      "available_values": [],
+      "default": "*"
+    },
+    {
+      "name": "pool",
+      "prefix": "pool",
+      "available_values": [],
+      "default": "*"
+    }
+  ],
+  "widgets": [
+    {
+      "definition": {
+        "type": "note",
+        "content": "# DBLab Engine Dashboard\nReal-time health, replication, data freshness, storage, and cloning metrics for all DBLab instances.\nFilter by **environment**, **instance**, or **pool** using the template variables above.",
+        "background_color": "blue",
+        "font_size": "14",
+        "text_align": "center",
+        "vertical_align": "center",
+        "show_tick": false,
+        "tick_pos": "50%",
+        "tick_edge": "bottom",
+        "has_padding": true
+      },
+      "layout": { "x": 0, "y": 0, "width": 12, "height": 2 }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "Health Status",
+        "background_color": "green",
+        "show_title": true,
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "check_status",
+              "title": "Instance Health",
+              "title_size": "16",
+              "title_align": "center",
+              "check": "dblab.instance.health",
+              "grouping": "cluster",
+              "group_by": [],
+              "tags": ["*"]
+            },
+            "layout": { "x": 0, "y": 0, "width": 4, "height": 2 }
+          },
+          {
+            "definition": {
+              "type": "check_status",
+              "title": "Data Refresh Health",
+              "title_size": "16",
+              "title_align": "center",
+              "check": "dblab.refresh.health",
+              "grouping": "cluster",
+              "group_by": [],
+              "tags": ["*"]
+            },
+            "layout": { "x": 4, "y": 0, "width": 4, "height": 2 }
+          },
+          {
+            "definition": {
+              "type": "check_status",
+              "title": "Replication Sync Health",
+              "title_size": "16",
+              "title_align": "center",
+              "check": "dblab.sync.health",
+              "grouping": "cluster",
+              "group_by": [],
+              "tags": ["*"]
+            },
+            "layout": { "x": 8, "y": 0, "width": 4, "height": 2 }
+          },
+          {
+            "definition": {
+              "type": "query_table",
+              "title": "Pool Health — Storage % Used by Pool",
+              "title_size": "16",
+              "title_align": "left",
+              "requests": [
+                {
+                  "formulas": [
+                    {
+                      "formula": "(query1 / query2) * 100",
+                      "alias": "% Used",
+                      "conditional_formats": [
+                        { "comparator": "<", "value": 70, "palette": "white_on_green" },
+                        { "comparator": ">=", "value": 70, "palette": "white_on_yellow" },
+                        { "comparator": ">=", "value": 85, "palette": "white_on_red" }
+                      ],
+                      "limit": { "count": 25, "order": "desc" }
+                    }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.pool.fs.used_bytes{env:$env,dblab_instance:$dblab_instance,pool:$pool} by {pool}",
+                      "aggregator": "last"
+                    },
+                    {
+                      "data_source": "metrics",
+                      "name": "query2",
+                      "query": "avg:dblab.pool.fs.size_bytes{env:$env,dblab_instance:$dblab_instance,pool:$pool} by {pool}",
+                      "aggregator": "last"
+                    }
+                  ],
+                  "response_format": "scalar"
+                }
+              ],
+              "has_search_bar": "never"
+            },
+            "layout": { "x": 0, "y": 2, "width": 12, "height": 4 }
+          }
+        ]
+      },
+      "layout": { "x": 0, "y": 0, "width": 12, "height": 7 }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "Replication & Data Freshness",
+        "background_color": "orange",
+        "show_title": true,
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Replication Lag",
+              "title_size": "16",
+              "title_align": "left",
+              "autoscale": true,
+              "precision": 1,
+              "requests": [
+                {
+                  "formulas": [
+                    { "formula": "query1" }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.sync.replication_lag_seconds{env:$env,dblab_instance:$dblab_instance}",
+                      "aggregator": "last"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    { "comparator": "<=", "value": 5, "palette": "white_on_green" },
+                    { "comparator": ">", "value": 5, "palette": "white_on_yellow" },
+                    { "comparator": ">", "value": 30, "palette": "white_on_red" }
+                  ]
+                }
+              ],
+              "custom_unit": "s"
+            },
+            "layout": { "x": 0, "y": 0, "width": 3, "height": 2 }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Time Since Last Refresh",
+              "title_size": "16",
+              "title_align": "left",
+              "autoscale": false,
+              "precision": 1,
+              "requests": [
+                {
+                  "formulas": [
+                    { "formula": "query1 / 3600" }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.refresh.age_seconds{env:$env,dblab_instance:$dblab_instance}",
+                      "aggregator": "last"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    { "comparator": "<=", "value": 24, "palette": "white_on_green" },
+                    { "comparator": ">", "value": 24, "palette": "white_on_yellow" },
+                    { "comparator": ">", "value": 72, "palette": "white_on_red" }
+                  ]
+                }
+              ],
+              "custom_unit": "hrs"
+            },
+            "layout": { "x": 3, "y": 0, "width": 3, "height": 2 }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Replication Lag Over Time",
+              "title_size": "16",
+              "title_align": "left",
+              "show_legend": true,
+              "legend_layout": "auto",
+              "legend_columns": ["avg", "min", "max", "value"],
+              "requests": [
+                {
+                  "formulas": [
+                    { "formula": "query1", "alias": "Replication Lag" }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.sync.replication_lag_seconds{env:$env,dblab_instance:$dblab_instance} by {dblab_instance}"
+                    }
+                  ],
+                  "response_format": "timeseries",
+                  "style": {
+                    "palette": "warm",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  },
+                  "display_type": "line"
+                }
+              ],
+              "yaxis": {
+                "include_zero": true,
+                "label": "seconds"
+              },
+              "markers": [
+                {
+                  "value": "y = 5",
+                  "display_type": "warning dashed",
+                  "label": "5s warning"
+                },
+                {
+                  "value": "y = 30",
+                  "display_type": "error dashed",
+                  "label": "30s critical"
+                }
+              ]
+            },
+            "layout": { "x": 6, "y": 0, "width": 6, "height": 3 }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Time Since Last Refresh Over Time",
+              "title_size": "16",
+              "title_align": "left",
+              "show_legend": true,
+              "legend_layout": "auto",
+              "legend_columns": ["avg", "min", "max", "value"],
+              "requests": [
+                {
+                  "formulas": [
+                    { "formula": "query1 / 3600", "alias": "Refresh Age (hrs)" }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.refresh.age_seconds{env:$env,dblab_instance:$dblab_instance} by {dblab_instance}"
+                    }
+                  ],
+                  "response_format": "timeseries",
+                  "style": {
+                    "palette": "orange",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  },
+                  "display_type": "line"
+                }
+              ],
+              "yaxis": {
+                "include_zero": true,
+                "label": "hours"
+              },
+              "markers": [
+                {
+                  "value": "y = 24",
+                  "display_type": "warning dashed",
+                  "label": "24h warning"
+                },
+                {
+                  "value": "y = 72",
+                  "display_type": "error dashed",
+                  "label": "72h critical"
+                }
+              ]
+            },
+            "layout": { "x": 0, "y": 3, "width": 12, "height": 3 }
+          }
+        ]
+      },
+      "layout": { "x": 0, "y": 0, "width": 12, "height": 7 }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "Cloning",
+        "background_color": "purple",
+        "show_title": true,
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Total Active Clones",
+              "title_size": "16",
+              "title_align": "left",
+              "autoscale": false,
+              "precision": 0,
+              "requests": [
+                {
+                  "formulas": [
+                    { "formula": "query1" }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.cloning.num_clones{env:$env,dblab_instance:$dblab_instance}",
+                      "aggregator": "last"
+                    }
+                  ],
+                  "response_format": "scalar"
+                }
+              ]
+            },
+            "layout": { "x": 0, "y": 0, "width": 3, "height": 2 }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Expected Clone Creation Time",
+              "title_size": "16",
+              "title_align": "left",
+              "autoscale": true,
+              "precision": 1,
+              "requests": [
+                {
+                  "formulas": [
+                    { "formula": "query1" }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.cloning.expected_time_seconds{env:$env,dblab_instance:$dblab_instance}",
+                      "aggregator": "last"
+                    }
+                  ],
+                  "response_format": "scalar"
+                }
+              ],
+              "custom_unit": "s"
+            },
+            "layout": { "x": 3, "y": 0, "width": 3, "height": 2 }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Active Clones Over Time",
+              "title_size": "16",
+              "title_align": "left",
+              "show_legend": true,
+              "legend_layout": "auto",
+              "legend_columns": ["avg", "min", "max", "value"],
+              "requests": [
+                {
+                  "formulas": [
+                    { "formula": "query1", "alias": "Active Clones" }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.cloning.num_clones{env:$env,dblab_instance:$dblab_instance} by {dblab_instance}"
+                    }
+                  ],
+                  "response_format": "timeseries",
+                  "style": {
+                    "palette": "purple",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  },
+                  "display_type": "bars"
+                }
+              ],
+              "yaxis": { "include_zero": true }
+            },
+            "layout": { "x": 6, "y": 0, "width": 6, "height": 3 }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Clones per Pool Over Time",
+              "title_size": "16",
+              "title_align": "left",
+              "show_legend": true,
+              "legend_layout": "auto",
+              "legend_columns": ["avg", "min", "max", "value"],
+              "requests": [
+                {
+                  "formulas": [
+                    { "formula": "query1", "alias": "Clone Count" }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.pool.clone_count{env:$env,dblab_instance:$dblab_instance,pool:$pool} by {pool}"
+                    }
+                  ],
+                  "response_format": "timeseries",
+                  "style": {
+                    "palette": "cool",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  },
+                  "display_type": "bars"
+                }
+              ],
+              "yaxis": { "include_zero": true }
+            },
+            "layout": { "x": 0, "y": 3, "width": 6, "height": 3 }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Expected Clone Creation Time Over Time",
+              "title_size": "16",
+              "title_align": "left",
+              "show_legend": true,
+              "legend_layout": "auto",
+              "legend_columns": ["avg", "min", "max", "value"],
+              "requests": [
+                {
+                  "formulas": [
+                    { "formula": "query1", "alias": "Expected Creation Time" }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.cloning.expected_time_seconds{env:$env,dblab_instance:$dblab_instance} by {dblab_instance}"
+                    }
+                  ],
+                  "response_format": "timeseries",
+                  "style": {
+                    "palette": "purple",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  },
+                  "display_type": "line"
+                }
+              ],
+              "yaxis": {
+                "include_zero": true,
+                "label": "seconds"
+              }
+            },
+            "layout": { "x": 6, "y": 3, "width": 6, "height": 3 }
+          }
+        ]
+      },
+      "layout": { "x": 0, "y": 0, "width": 12, "height": 7 }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "Pool Storage",
+        "background_color": "yellow",
+        "show_title": true,
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Pool Storage % Used",
+              "title_size": "16",
+              "title_align": "left",
+              "autoscale": false,
+              "precision": 1,
+              "requests": [
+                {
+                  "formulas": [
+                    { "formula": "(query1 / query2) * 100" }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.pool.fs.used_bytes{env:$env,dblab_instance:$dblab_instance,pool:$pool}",
+                      "aggregator": "last"
+                    },
+                    {
+                      "data_source": "metrics",
+                      "name": "query2",
+                      "query": "avg:dblab.pool.fs.size_bytes{env:$env,dblab_instance:$dblab_instance,pool:$pool}",
+                      "aggregator": "last"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    { "comparator": "<", "value": 70, "palette": "white_on_green" },
+                    { "comparator": ">=", "value": 70, "palette": "white_on_yellow" },
+                    { "comparator": ">=", "value": 85, "palette": "white_on_red" }
+                  ]
+                }
+              ],
+              "custom_unit": "%"
+            },
+            "layout": { "x": 0, "y": 0, "width": 3, "height": 2 }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Free Space",
+              "title_size": "16",
+              "title_align": "left",
+              "autoscale": true,
+              "precision": 2,
+              "requests": [
+                {
+                  "formulas": [
+                    { "formula": "query1" }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.pool.fs.free_bytes{env:$env,dblab_instance:$dblab_instance,pool:$pool}",
+                      "aggregator": "last"
+                    }
+                  ],
+                  "response_format": "scalar"
+                }
+              ],
+              "custom_unit": "B"
+            },
+            "layout": { "x": 3, "y": 0, "width": 2, "height": 2 }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Used Space",
+              "title_size": "16",
+              "title_align": "left",
+              "autoscale": true,
+              "precision": 2,
+              "requests": [
+                {
+                  "formulas": [
+                    { "formula": "query1" }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.pool.fs.used_bytes{env:$env,dblab_instance:$dblab_instance,pool:$pool}",
+                      "aggregator": "last"
+                    }
+                  ],
+                  "response_format": "scalar"
+                }
+              ],
+              "custom_unit": "B"
+            },
+            "layout": { "x": 5, "y": 0, "width": 2, "height": 2 }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Total Size",
+              "title_size": "16",
+              "title_align": "left",
+              "autoscale": true,
+              "precision": 2,
+              "requests": [
+                {
+                  "formulas": [
+                    { "formula": "query1" }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.pool.fs.size_bytes{env:$env,dblab_instance:$dblab_instance,pool:$pool}",
+                      "aggregator": "last"
+                    }
+                  ],
+                  "response_format": "scalar"
+                }
+              ],
+              "custom_unit": "B"
+            },
+            "layout": { "x": 7, "y": 0, "width": 2, "height": 2 }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Compression Ratio",
+              "title_size": "16",
+              "title_align": "left",
+              "autoscale": false,
+              "precision": 2,
+              "requests": [
+                {
+                  "formulas": [
+                    { "formula": "query1" }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.pool.fs.compress_ratio{env:$env,dblab_instance:$dblab_instance,pool:$pool}",
+                      "aggregator": "last"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    { "comparator": ">=", "value": 2, "palette": "white_on_green" },
+                    { "comparator": "<", "value": 2, "palette": "white_on_yellow" },
+                    { "comparator": "<", "value": 1, "palette": "white_on_red" }
+                  ]
+                }
+              ],
+              "custom_unit": "x"
+            },
+            "layout": { "x": 9, "y": 0, "width": 3, "height": 2 }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Pool Storage: Free vs Used",
+              "title_size": "16",
+              "title_align": "left",
+              "show_legend": true,
+              "legend_layout": "auto",
+              "legend_columns": ["avg", "min", "max", "value"],
+              "requests": [
+                {
+                  "formulas": [
+                    { "formula": "query1", "alias": "Used" },
+                    { "formula": "query2", "alias": "Free" }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.pool.fs.used_bytes{env:$env,dblab_instance:$dblab_instance,pool:$pool} by {pool}"
+                    },
+                    {
+                      "data_source": "metrics",
+                      "name": "query2",
+                      "query": "avg:dblab.pool.fs.free_bytes{env:$env,dblab_instance:$dblab_instance,pool:$pool} by {pool}"
+                    }
+                  ],
+                  "response_format": "timeseries",
+                  "style": {
+                    "palette": "semantic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  },
+                  "display_type": "area"
+                }
+              ],
+              "yaxis": {
+                "include_zero": true,
+                "label": "bytes"
+              }
+            },
+            "layout": { "x": 0, "y": 2, "width": 6, "height": 3 }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Storage Breakdown: Data, Snapshots, Clones",
+              "title_size": "16",
+              "title_align": "left",
+              "show_legend": true,
+              "legend_layout": "auto",
+              "legend_columns": ["avg", "min", "max", "value"],
+              "requests": [
+                {
+                  "formulas": [
+                    { "formula": "query1", "alias": "Data Size" },
+                    { "formula": "query2", "alias": "Used by Snapshots" },
+                    { "formula": "query3", "alias": "Used by Clones" }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.pool.fs.data_size_bytes{env:$env,dblab_instance:$dblab_instance,pool:$pool} by {pool}"
+                    },
+                    {
+                      "data_source": "metrics",
+                      "name": "query2",
+                      "query": "avg:dblab.pool.fs.used_by_snapshots_bytes{env:$env,dblab_instance:$dblab_instance,pool:$pool} by {pool}"
+                    },
+                    {
+                      "data_source": "metrics",
+                      "name": "query3",
+                      "query": "avg:dblab.pool.fs.used_by_clones_bytes{env:$env,dblab_instance:$dblab_instance,pool:$pool} by {pool}"
+                    }
+                  ],
+                  "response_format": "timeseries",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  },
+                  "display_type": "area"
+                }
+              ],
+              "yaxis": {
+                "include_zero": true,
+                "label": "bytes"
+              }
+            },
+            "layout": { "x": 6, "y": 2, "width": 6, "height": 3 }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Compression Ratio Over Time",
+              "title_size": "16",
+              "title_align": "left",
+              "show_legend": true,
+              "legend_layout": "auto",
+              "legend_columns": ["avg", "min", "max", "value"],
+              "requests": [
+                {
+                  "formulas": [
+                    { "formula": "query1", "alias": "Compression Ratio" }
+                  ],
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "query1",
+                      "query": "avg:dblab.pool.fs.compress_ratio{env:$env,dblab_instance:$dblab_instance,pool:$pool} by {pool}"
+                    }
+                  ],
+                  "response_format": "timeseries",
+                  "style": {
+                    "palette": "cool",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  },
+                  "display_type": "line"
+                }
+              ],
+              "yaxis": {
+                "include_zero": false,
+                "label": "ratio"
+              }
+            },
+            "layout": { "x": 0, "y": 5, "width": 12, "height": 3 }
+          }
+        ]
+      },
+      "layout": { "x": 0, "y": 0, "width": 12, "height": 9 }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "Events",
+        "background_color": "pink",
+        "show_title": true,
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "event_timeline",
+              "title": "Refresh Failure Timeline",
+              "title_size": "16",
+              "title_align": "left",
+              "query": "sources:dblab dblab.refresh.failed",
+              "tags_execution": "and"
+            },
+            "layout": { "x": 0, "y": 0, "width": 12, "height": 2 }
+          },
+          {
+            "definition": {
+              "type": "event_stream",
+              "title": "Refresh Failure Events",
+              "title_size": "16",
+              "title_align": "left",
+              "query": "sources:dblab dblab.refresh.failed",
+              "tags_execution": "and",
+              "event_size": "s"
+            },
+            "layout": { "x": 0, "y": 2, "width": 12, "height": 4 }
+          }
+        ]
+      },
+      "layout": { "x": 0, "y": 0, "width": 12, "height": 7 }
+    }
+  ],
+  "notify_list": []
+}
